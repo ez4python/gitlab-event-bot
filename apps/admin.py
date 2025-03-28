@@ -1,10 +1,28 @@
 from django.contrib import admin
-from apps.models import GitLabEvent
+from .models import WebhookSettings, GitLabEvent
 
 
-@admin.register(GitLabEvent)
-class GitLabEventAdmin(admin.ModelAdmin):
-    list_display = ('event_type', 'project_name', 'user_name', 'created_at')
-    list_filter = ('event_type', 'project_name')
-    search_fields = ('project_name', 'user_name', 'event_type')
-    readonly_fields = ('created_at',)
+class WebhookSettingsAdmin(admin.ModelAdmin):
+    list_display = (
+        'chat_id',
+        'message_thread_id',
+        'topic',
+        'show_project',
+        'show_status',
+        'show_branch',
+        'show_user',
+        'show_duration'
+    )
+    list_editable = (
+        'message_thread_id',
+        'topic',
+        'show_project',
+        'show_status',
+        'show_branch',
+        'show_user',
+        'show_duration'
+    )
+
+
+admin.site.register(WebhookSettings, WebhookSettingsAdmin)
+admin.site.register(GitLabEvent)

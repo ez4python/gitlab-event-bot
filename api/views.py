@@ -1,89 +1,55 @@
-import json
-import logging
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
 from django.conf import settings
-from apps.models import GitLabEvent
-from api.serializers import GitLabEventSerializer
-from api.telegram_service import TelegramService
-from api.gitlab_parser import GitLabEventParser
+import requests
 
-logger = logging.getLogger(__name__)
+from api.serializers import GitLabWebhookSerializer
+from apps.models import WebhookSettings, GitLabEvent
+
+TELEGRAM_URL = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
 
 
 class GitLabWebhookView(APIView):
-    """
-    API view to handle GitLab webhook events and forward them to Telegram.
-    Only accepts merge, push, and pipeline events.
-    """
+    def post(self, request):
+        x_gitlab_event = request.headers.get("X-Gitlab-Event", "Unknown Event")
+        data = {
+            "x_gitlab_event": x_gitlab_event,
+            "project_name": request.data.get("project", {}).get("name", ""),
+            "status": request.data.get("object_attributes", {}).get("status", ""),
+            "branch": request.data.get("object_attributes", {}).get("ref", ""),
+            "user_name": request.data.get("user", {}).get("name", ""),
+            "duration": request.data.get("object_attributes", {}).get("duration"),
+        }
 
-    # List of allowed event types
-    ALLOWED_EVENT_TYPES = ['merge_request', 'push', 'pipeline']
+        serializer = GitLabWebhookSerializer(data=data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
 
-    def post(self, request, format=None):
-        # Verify GitLab webhook token if configured
-        if settings.GITLAB_TOKEN:
-            header_token = request.headers.get('X-Gitlab-Token')
-            if not header_token or header_token != settings.GITLAB_TOKEN:
-                logger.warning("Invalid GitLab webhook token")
-                return Response({"error": "Invalid token"}, status=status.HTTP_403_FORBIDDEN)
+        settings = WebhookSettings.objects.first()
+        if not settings:
+            return Response({"error": "Webhook settings not found"}, status=400)
 
-        # Get event type from headers
-        event_type = request.headers.get('X-Gitlab-Event')
-        if not event_type:
-            logger.warning("Missing GitLab event type header")
-            return Response({"error": "Missing event type"}, status=status.HTTP_400_BAD_REQUEST)
+        event = GitLabEvent.objects.create(**serializer.validated_data)
 
-        # Extract event type from header (e.g., "Push Hook" -> "push")
-        event_type = event_type.lower().replace(' hook', '').replace(' event', '')
+        message = f"*🚀 Event Update:* `{x_gitlab_event}`\n"
 
-        # Check if the event type is allowed
-        if event_type not in self.ALLOWED_EVENT_TYPES:
-            logger.info(f"Ignoring unsupported event type: {event_type}")
-            return Response(
-                {"status": "ignored", "message": f"Event type '{event_type}' is not supported"},
-                status=status.HTTP_200_OK
-            )
+        if settings.show_project and event.project_name:
+            message += f" *🎯 Project:* `{event.project_name}`\n"
+        if settings.show_status and event.status:
+            message += f" *📌 Status:* `{event.status}`\n"
+        if settings.show_branch and event.branch:
+            message += f" *🌿 Branch:* `{event.branch}`\n"
+        if settings.show_user and event.user_name:
+            message += f" *👤 User:* `{event.user_name}`\n"
+        if settings.show_duration and event.duration is not None:
+            message += f" *⏳ Duration:* `{event.duration}` sec\n"
 
-        try:
-            # Parse the event data
-            event_data = request.data
+        payload = {
+            "chat_id": settings.chat_id,
+            "message_thread_id": settings.message_thread_id,
+            "text": f"*📢 Topic: {settings.topic if settings.topic else 'General'}*\n\n{message}",
+            "parse_mode": "MarkdownV2"
+        }
+        requests.post(TELEGRAM_URL, json=payload)
 
-            # Save the event to the database
-            gitlab_event = GitLabEvent(
-                event_type=event_type,
-                project_name=event_data.get('project', {}).get('name', 'Unknown'),
-                user_name=event_data.get('user_name') or event_data.get('user', {}).get('name', 'Unknown'),
-                event_data=event_data
-            )
-            gitlab_event.save()
-
-            # Parse the event into a formatted message
-            message = GitLabEventParser.parse_event(event_type, event_data)
-
-            # Determine the topic ID based on the project or event type
-            # For simplicity, we'll use a fixed topic ID from settings
-            # In a real application, you might want to map projects to specific topics
-            topic_id = 1  # Default topic ID
-
-            # Send the message to Telegram
-            telegram_service = TelegramService()
-            sent = telegram_service.send_message(topic_id, message)
-
-            if sent:
-                logger.info(f"Successfully sent {event_type} event to Telegram")
-                return Response({"status": "success", "message": "Event processed and sent to Telegram"})
-            else:
-                logger.error(f"Failed to send {event_type} event to Telegram")
-                return Response(
-                    {"status": "error", "message": "Failed to send event to Telegram"},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
-
-        except Exception as e:
-            logger.exception(f"Error processing GitLab webhook: {e}")
-            return Response(
-                {"status": "error", "message": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+        return Response({"status": "ok"})

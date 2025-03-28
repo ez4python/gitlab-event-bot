@@ -11,9 +11,8 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 DEBUG = True
 
 # env variables
-BOT_TOKEN = os.getenv('BOT_TOKEN')
+TELEGRAM_BOT_TOKEN = os.getenv('BOT_TOKEN')
 GROUP_ID = os.getenv('GROUP_ID')
-TOPIC_ID = os.getenv('TOPIC_ID')
 GITLAB_TOKEN = os.getenv('GITLAB_TOKEN')
 
 ALLOWED_HOSTS = ['*']
@@ -34,6 +33,37 @@ INSTALLED_APPS = [
     'rest_framework',
     'drf_spectacular',
 ]
+
+# REST Framework settings
+REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.AllowAny',
+    ],
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.BasicAuthentication',
+    ],
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Gitlab Events',
+    'DESCRIPTION': 'gg',
+    'TOS': True,
+    'VERSION': '1.0.0',
+    'DISABLE_ERRORS_AND_WARNINGS': False,
+    'CONTACT': {"email": "akbaralisalohiddinov808@gmail.com"},
+    'SORT_OPERATIONS': False,
+    'SERVE_AUTHENTICATION': [
+        "rest_framework.authentication.BasicAuthentication"
+    ],
+    "SWAGGER_UI_SETTINGS": {
+        "deepLinking": True,
+        "persistAuthorization": True,
+        "displayOperationId": True,
+        "filter": True,
+    },
+    "PERSIST_AUTH": True,
+}
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

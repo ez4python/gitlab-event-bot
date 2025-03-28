@@ -1,9 +1,10 @@
 from rest_framework import serializers
-
 from apps.models import GitLabEvent
 
 
-class GitLabEventSerializer(serializers.ModelSerializer):
+class GitLabWebhookSerializer(serializers.ModelSerializer):
+    gitlab_event = serializers.ChoiceField(choices=GitLabEvent.EVENT_CHOICES)
+
     class Meta:
         model = GitLabEvent
-        fields = '__all__'
+        fields = ['gitlab_event', 'project_name', 'status', 'branch', 'user_name', 'duration']
