@@ -1,3 +1,5 @@
+from drf_spectacular.utils import extend_schema
+from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.conf import settings
@@ -10,10 +12,16 @@ TELEGRAM_URL = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendM
 
 
 class GitLabWebhookView(APIView):
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        request=GitLabWebhookSerializer,
+        responses={200, GitLabWebhookSerializer},
+    )
     def post(self, request):
         x_gitlab_event = request.headers.get("X-Gitlab-Event", "Unknown Event")
         data = {
-            "x_gitlab_event": x_gitlab_event,
+            "gitlab_event": request.data.get('object_kind'),
             "project_name": request.data.get("project", {}).get("name", ""),
             "status": request.data.get("object_attributes", {}).get("status", ""),
             "branch": request.data.get("object_attributes", {}).get("ref", ""),
@@ -50,6 +58,9 @@ class GitLabWebhookView(APIView):
             "text": f"*📢 Topic: {settings.topic if settings.topic else 'General'}*\n\n{message}",
             "parse_mode": "MarkdownV2"
         }
-        requests.post(TELEGRAM_URL, json=payload)
+        response = requests.post(TELEGRAM_URL, json=payload).text
 
-        return Response({"status": "ok"})
+        return Response({
+            'status': 'ok',
+            'response': response,
+        })

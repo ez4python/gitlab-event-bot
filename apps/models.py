@@ -20,13 +20,7 @@ class WebhookSettings(models.Model):
 
 
 class GitLabEvent(models.Model):
-    EVENT_CHOICES = [
-        ('push', 'Push Hook'),
-        ('merge_request', 'Merge Request Hook'),
-        ('pipeline', 'Pipeline Hook'),
-    ]
-
-    gitlab_event = models.CharField(max_length=20, choices=EVENT_CHOICES)
+    gitlab_event = models.CharField(max_length=20)
     project_name = models.CharField(max_length=255)
     status = models.CharField(max_length=50)
     branch = models.CharField(max_length=100)
