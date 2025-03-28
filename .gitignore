@@ -118,3 +118,4 @@ cython_debug/
 *.pyc
 apps/migrations/*
 !apps/migrations/__init__.py
+local.env
