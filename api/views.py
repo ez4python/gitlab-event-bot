@@ -1,66 +1,123 @@
 from drf_spectacular.utils import extend_schema
-from rest_framework.permissions import AllowAny
-from rest_framework.views import APIView
+from rest_framework import status
 from rest_framework.response import Response
-from django.conf import settings
-import requests
+from rest_framework.views import APIView
 
-from api.serializers import GitLabWebhookSerializer
-from apps.models import WebhookSettings, GitLabEvent
+from api.bot import send_message, edit_message
+from api.serializers import GitLabEventSerializer
+from api.utils import save_telegram_message_id, get_telegram_message_id, delete_telegram_message_id
+from apps.models import GitlabProject, ProjectUser
 
-TELEGRAM_URL = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
 
-
+@extend_schema(
+    methods=["POST"],
+    description="GitLab webhook endpoint (faqat push, merge-request va pipeline eventlar uchun).",
+    responses={200: dict, 400: dict, 500: dict}
+)
 class GitLabWebhookView(APIView):
-    permission_classes = [AllowAny]
+    authentication_classes = []
+    permission_classes = []
 
-    @extend_schema(
-        request=GitLabWebhookSerializer,
-        responses={200, GitLabWebhookSerializer},
-    )
     def post(self, request):
-        x_gitlab_event = request.headers.get("X-Gitlab-Event", "Unknown Event")
-        data = {
-            "gitlab_event": request.data.get('object_kind'),
-            "project_name": request.data.get("project", {}).get("name", ""),
-            "status": request.data.get("object_attributes", {}).get("status", ""),
-            "branch": request.data.get("object_attributes", {}).get("ref", ""),
-            "user_name": request.data.get("user", {}).get("name", ""),
-            "duration": request.data.get("object_attributes", {}).get("duration"),
-        }
+        try:
+            event_type = request.headers.get('X-Gitlab-Event')
+            payload = request.data
 
-        serializer = GitLabWebhookSerializer(data=data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=400)
+            if event_type not in ['Push Hook', 'Merge Request Hook', 'Pipeline Hook']:
+                return Response({'status': 'ignored'}, status=status.HTTP_200_OK)
 
-        settings = WebhookSettings.objects.first()
-        if not settings:
-            return Response({"error": "Webhook settings not found"}, status=400)
+            # get project name directly from payload
+            project_name = payload.get('project', {}).get('name')
+            if not project_name:
+                return Response({'error': 'Missing project name in payload'}, status=status.HTTP_400_BAD_REQUEST)
 
-        event = GitLabEvent.objects.create(**serializer.validated_data)
+            # get or create project
+            project, created = GitlabProject.objects.get_or_create(name=project_name)
+            if created:
+                project.webhook_chat_id = ""
+                project.webhook_message_thread_id = None
+                project.save()
 
-        message = f"*🚀 Event Update:* `{x_gitlab_event}`\n"
+            # parse event info
+            if event_type == 'Push Hook':
+                branch = payload.get('ref', '').split('/')[-1]
+                user_name = payload.get('user_username')
+                status_text = 'pushed'
+                gitlab_event = 'push'
 
-        if settings.show_project and event.project_name:
-            message += f" *🎯 Project:* `{event.project_name}`\n"
-        if settings.show_status and event.status:
-            message += f" *📌 Status:* `{event.status}`\n"
-        if settings.show_branch and event.branch:
-            message += f" *🌿 Branch:* `{event.branch}`\n"
-        if settings.show_user and event.user_name:
-            message += f" *👤 User:* `{event.user_name}`\n"
-        if settings.show_duration and event.duration is not None:
-            message += f" *⏳ Duration:* `{event.duration}` sec\n"
+            elif event_type == 'Merge Request Hook':
+                attr = payload.get('object_attributes', {})
+                branch = attr.get('source_branch')
+                status_text = attr.get('state')
+                user_name = payload.get('user', {}).get('username')
+                gitlab_event = 'merge'
 
-        payload = {
-            "chat_id": settings.chat_id,
-            "message_thread_id": settings.message_thread_id,
-            "text": f"*📢 Topic: {settings.topic if settings.topic else 'General'}*\n\n{message}",
-            "parse_mode": "MarkdownV2"
-        }
-        response = requests.post(TELEGRAM_URL, json=payload).text
+            elif event_type == 'Pipeline Hook':
+                attr = payload.get('object_attributes', {})
+                ref = attr.get('ref') or payload.get('ref')
+                branch = ref.split('/')[-1] if ref else ''
+                status_text = attr.get('status')
+                user_name = payload.get('user', {}).get('username')
+                gitlab_event = 'pipeline'
 
-        return Response({
-            'status': 'ok',
-            'response': response,
-        })
+            else:
+                return Response({'status': 'ignored'}, status=status.HTTP_200_OK)
+
+            event_data = {
+                'gitlab_event': gitlab_event,
+                'project': project.id,
+                'status': status_text,
+                'branch': branch,
+                'user_name': user_name,
+                'duration': payload.get('object_attributes', {}).get('duration', 0),
+            }
+
+            serializer = GitLabEventSerializer(data=event_data)
+            if serializer.is_valid():
+                serializer.save()
+            else:
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+            # prepare telegram message
+            chat_id = project.telegram_chat_id
+            thread_id = project.telegram_message_thread_id
+            event_key = f"{project.id}:{gitlab_event}:{branch}:{user_name}"
+
+            user = ProjectUser.objects.filter(project=project, gitlab_username=user_name).first()
+            mention = f"[{user_name}](tg://user?id={user.telegram_id})" if user else user_name
+
+            message = f"🚀 *Event Update:* `{event_type}`\n"
+            if project.show_project:
+                message += f"🎯 *Project:* `{project.name}`\n"
+            if project.show_status:
+                message += f"📌 *Status:* `{status_text}`\n"
+            if project.show_branch:
+                message += f"🌿 *Branch:* `{branch}`\n"
+            if project.show_user:
+                message += f"👤 *User:* {mention}\n"
+            if project.show_duration:
+                message += f"⏳ *Duration:* `{event_data['duration']}s`\n"
+
+            # decide whether to update or send new message
+            update_statuses = ['push', 'opened', 'pipeline started', 'pending', 'running']
+            final_statuses = ['success', 'failed', 'canceled', 'skipped', 'finished']
+
+            if gitlab_event == 'pipeline' and status_text in update_statuses:
+                msg_id = get_telegram_message_id(event_key)
+                if msg_id:
+                    edit_message(chat_id, int(msg_id), message)
+                else:
+                    msg = send_message(chat_id, thread_id, message)
+                    save_telegram_message_id(event_key, msg['message_id'])
+            elif gitlab_event == 'pipeline' and status_text in final_statuses:
+                msg_id = get_telegram_message_id(event_key)
+                edit_message(chat_id, int(msg_id), message)
+                delete_telegram_message_id(event_key)
+
+            else:
+                send_message(chat_id, thread_id, message)
+
+            return Response({'status': 'ok'}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

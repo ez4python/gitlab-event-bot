@@ -15,3 +15,6 @@ clean-migrations:
 
 push:
 	git push origin main && git push gitlab main
+
+run:
+	docker start tg_redis

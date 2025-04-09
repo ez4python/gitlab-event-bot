@@ -1,28 +1,34 @@
 from django.contrib import admin
-from .models import WebhookSettings, GitLabEvent
+from .models import GitlabProject, ProjectUser
 
 
-class WebhookSettingsAdmin(admin.ModelAdmin):
+class ProjectUserInline(admin.TabularInline):
+    model = ProjectUser
+    extra = 1
+
+
+class ProjectUserAdmin(admin.ModelAdmin):
+    list_display = ('gitlab_username', 'telegram_id', 'project')
+    search_fields = ('gitlab_username', 'project__name')
+
+
+class GitlabProjectAdmin(admin.ModelAdmin):
     list_display = (
-        'chat_id',
-        'message_thread_id',
-        'topic',
-        'show_project',
-        'show_status',
-        'show_branch',
+        'name',
+        'telegram_chat_id',
+        'telegram_message_thread_id',
         'show_user',
+        'show_project',
+        'show_branch',
+        'show_status',
         'show_duration'
     )
-    list_editable = (
-        'message_thread_id',
-        'topic',
-        'show_project',
-        'show_status',
-        'show_branch',
-        'show_user',
-        'show_duration'
-    )
+    search_fields = ('name',)
+    list_filter = ('name',)
+
+    inlines = [ProjectUserInline]
 
 
-admin.site.register(WebhookSettings, WebhookSettingsAdmin)
-admin.site.register(GitLabEvent)
+# Register models with updated admin
+admin.site.register(GitlabProject, GitlabProjectAdmin)
+admin.site.register(ProjectUser, ProjectUserAdmin)

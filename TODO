@@ -1,0 +1,26 @@
+Merge Request Events:
+    * Opened
+    * Updated
+    * Approved
+    * Unapproved
+    * Merged
+    * Closed
+    * Pipeline started
+    * Pipeline finished
+
+Pipeline Events:
+    * Pending
+    * Running
+    * Success
+    * Failed
+    * Canceled
+    * Skipped
+
+Push Events:
+    * Pending
+    * Running
+    * Success
+    * Failed
+    * Canceled
+    * Skipped
+

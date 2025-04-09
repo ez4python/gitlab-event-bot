@@ -10,7 +10,10 @@ headers = {
     'X-Gitlab-Event': 'Pipeline Hook'
 }
 
-response = requests.post('http://127.0.0.1:8000/api/gitlab-webhook/', json=json_data, headers=headers)
+response = requests.post('http://127.0.0.1:8000/api/gitlab/webhook/', json=json_data, headers=headers)
 
-print(response.status_code)
-print(response.json())
+try:
+    print(response.status_code)
+    print(response.json())
+except ValueError:
+    print("Response is not a valid JSON:", response.text)

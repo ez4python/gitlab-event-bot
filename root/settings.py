@@ -11,9 +11,7 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 DEBUG = True
 
 # env variables
-TELEGRAM_BOT_TOKEN = os.getenv('BOT_TOKEN')
-GROUP_ID = os.getenv('GROUP_ID')
-GITLAB_TOKEN = os.getenv('GITLAB_TOKEN')
+TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 
 ALLOWED_HOSTS = ['*']
 
@@ -33,6 +31,17 @@ INSTALLED_APPS = [
     'rest_framework',
     'drf_spectacular',
 ]
+
+# CACHE
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://127.0.0.1:6379/0",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
+}
 
 # REST Framework settings
 REST_FRAMEWORK = {
@@ -57,6 +66,7 @@ SPECTACULAR_SETTINGS = {
         "rest_framework.authentication.BasicAuthentication"
     ],
     "SWAGGER_UI_SETTINGS": {
+
         "deepLinking": True,
         "persistAuthorization": True,
         "displayOperationId": True,
