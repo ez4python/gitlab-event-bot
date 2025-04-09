@@ -18,3 +18,6 @@ push:
 
 run:
 	docker start tg_redis
+
+check-keys:
+	 docker exec -it tg_redis redis-cli keys '*'
