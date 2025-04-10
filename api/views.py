@@ -10,7 +10,7 @@ from apps.models import GitlabProject, GitlabUser
 
 
 @extend_schema(
-    # request=GitLabEventSerializer,
+    request=GitLabEventSerializer,
     methods=["POST"],
     description="GitLab webhook endpoint (faqat push, merge-request va pipeline eventlar uchun).",
     responses={200: dict, 400: dict, 500: dict},
@@ -114,7 +114,6 @@ class GitLabWebhookView(APIView):
                 msg_id = get_telegram_message_id(event_key)
                 edit_message(chat_id, int(msg_id), message)
                 delete_telegram_message_id(event_key)
-
             else:
                 send_message(chat_id, thread_id, message)
 
