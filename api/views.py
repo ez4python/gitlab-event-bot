@@ -10,7 +10,7 @@ from apps.models import GitlabProject, GitlabUser
 
 
 @extend_schema(
-    request=GitLabEventSerializer,
+    # request=GitLabEventSerializer,
     methods=["POST"],
     description="GitLab webhook endpoint (faqat push, merge-request va pipeline eventlar uchun).",
     responses={200: dict, 400: dict, 500: dict},
