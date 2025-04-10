@@ -15,4 +15,3 @@ job2:
     - echo "Deploying application..."
     - sleep 3
     - echo "Deployed!"
-
