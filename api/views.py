@@ -39,14 +39,13 @@ class GitLabWebhookView(APIView):
                 project.webhook_message_thread_id = None
                 project.save()
 
-            full_name = payload.get('user', {}).get('name')
-
             # parse event info
             if event_type == 'Push Hook':
                 branch = payload.get('ref', '').split('/')[-1]
                 user_name = payload.get('user_username')
                 status_text = 'pushed'
                 gitlab_event = 'push'
+                full_name = payload.get('user_name', '')
 
             elif event_type == 'Merge Request Hook':
                 attr = payload.get('object_attributes', {})
@@ -54,6 +53,7 @@ class GitLabWebhookView(APIView):
                 status_text = attr.get('state')
                 user_name = payload.get('user', {}).get('username')
                 gitlab_event = 'merge'
+                full_name = payload.get('user', {}).get('name')
 
             elif event_type == 'Pipeline Hook':
                 attr = payload.get('object_attributes', {})
@@ -62,6 +62,7 @@ class GitLabWebhookView(APIView):
                 status_text = attr.get('status')
                 user_name = payload.get('user', {}).get('username')
                 gitlab_event = 'pipeline'
+                full_name = payload.get('user', {}).get('name')
 
             else:
                 return Response({'status': 'ignored'}, status=status.HTTP_200_OK)
