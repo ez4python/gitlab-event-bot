@@ -114,8 +114,9 @@ class GitLabWebhookView(APIView):
                     save_telegram_message_id(event_key, msg['message_id'])
             elif gitlab_event == 'pipeline' and status_text in final_statuses:
                 msg_id = get_telegram_message_id(event_key)
-                edit_message(chat_id, int(msg_id), message)
-                delete_telegram_message_id(event_key)
+                if msg_id:
+                    edit_message(chat_id, int(msg_id), message)
+                    delete_telegram_message_id(event_key)
             else:
                 send_message(chat_id, thread_id, message)
 
