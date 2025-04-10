@@ -140,42 +140,25 @@ STATIC_URL = 'static/'
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-
-# settings.py
-
-import os
-
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
-
-    'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {message}',
-            'style': '{',
-        },
-        'simple': {
-            'format': '[{levelname}] {message}',
-            'style': '{',
-        },
-    },
-
     'handlers': {
         'console': {
+            'level': 'ERROR',  # Set to ERROR or CRITICAL to suppress INFO/DEBUG logs
             'class': 'logging.StreamHandler',
-            'formatter': 'simple',
-        },
-        'file': {
-            'class': 'logging.FileHandler',
-            'filename': os.path.join(BASE_DIR, 'webhook.log'),
-            'formatter': 'verbose',
         },
     },
-
     'loggers': {
-        'webhook': {
-            'handlers': ['console', 'file'],
-            'level': 'DEBUG',
+        'watchdog': {  # Adjust the logger name to the specific package if necessary
+            'handlers': ['console'],
+            'level': 'ERROR',  # Suppress lower level logs
+            'propagate': False,
+        },
+        'django': {
+            'handlers': ['console'],
+            'level': 'ERROR',
+            'propagate': True,
         },
     },
 }
