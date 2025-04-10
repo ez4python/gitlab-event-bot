@@ -84,7 +84,7 @@ class GitLabWebhookView(APIView):
             thread_id = project.telegram_message_thread_id
             event_key = f"{project.id}:{gitlab_event}:{branch}:{user_name}"
 
-            user = GitlabUser.objects.filter(project=project, gitlab_username=user_name).first()
+            user = GitlabUser.objects.filter(projects=project, gitlab_username=user_name).first()
             mention = f"[{user_name}](tg://user?id={user.telegram_id})" if user else user_name
 
             message = f"🚀 *Event Update:* `{event_type}`\n"

@@ -139,26 +139,3 @@ STATIC_URL = 'static/'
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'handlers': {
-        'console': {
-            'level': 'ERROR',  # Set to ERROR or CRITICAL to suppress INFO/DEBUG logs
-            'class': 'logging.StreamHandler',
-        },
-    },
-    'loggers': {
-        'watchdog': {  # Adjust the logger name to the specific package if necessary
-            'handlers': ['console'],
-            'level': 'ERROR',  # Suppress lower level logs
-            'propagate': False,
-        },
-        'django': {
-            'handlers': ['console'],
-            'level': 'ERROR',
-            'propagate': True,
-        },
-    },
-}
