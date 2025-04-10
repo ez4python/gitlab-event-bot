@@ -1,34 +1,18 @@
 from django.contrib import admin
-from .models import GitlabProject, ProjectUser
+from apps.models import GitlabProject, GitlabUser, GitLabEvent
 
 
-class ProjectUserInline(admin.TabularInline):
-    model = ProjectUser
-    extra = 1
-
-
-class ProjectUserAdmin(admin.ModelAdmin):
-    list_display = ('gitlab_username', 'telegram_id', 'project')
-    search_fields = ('gitlab_username', 'project__name')
-
-
+@admin.register(GitlabProject)
 class GitlabProjectAdmin(admin.ModelAdmin):
-    list_display = (
-        'name',
-        'telegram_chat_id',
-        'telegram_message_thread_id',
-        'show_user',
-        'show_project',
-        'show_branch',
-        'show_status',
-        'show_duration'
-    )
-    search_fields = ('name',)
-    list_filter = ('name',)
-
-    inlines = [ProjectUserInline]
+    list_display = ('name', 'telegram_chat_id')
 
 
-# Register models with updated admin
-admin.site.register(GitlabProject, GitlabProjectAdmin)
-admin.site.register(ProjectUser, ProjectUserAdmin)
+@admin.register(GitlabUser)
+class GitlabUserAdmin(admin.ModelAdmin):
+    list_display = ('gitlab_username', 'telegram_id')
+    filter_horizontal = ('projects',)
+
+
+@admin.register(GitLabEvent)
+class GitLabEventAdmin(admin.ModelAdmin):
+    list_display = ('gitlab_event', 'project', 'user_name', 'status', 'created_at')

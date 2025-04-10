@@ -1,7 +1,17 @@
 stages:
   - test
+  - deploy
 
 job1:
   stage: test
   script:
-    - echo "Pipeline is working!"
+    - echo "Running tests..."
+    - sleep 5
+    - echo "Tests passed!"
+
+job2:
+  stage: deploy
+  script:
+    - echo "Deploying application..."
+    - sleep 3
+    - echo "Deployed!"

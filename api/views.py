@@ -6,13 +6,14 @@ from rest_framework.views import APIView
 from api.bot import send_message, edit_message
 from api.serializers import GitLabEventSerializer
 from api.utils import save_telegram_message_id, get_telegram_message_id, delete_telegram_message_id
-from apps.models import GitlabProject, ProjectUser
+from apps.models import GitlabProject, GitlabUser
 
 
 @extend_schema(
+    request=GitLabEventSerializer,
     methods=["POST"],
     description="GitLab webhook endpoint (faqat push, merge-request va pipeline eventlar uchun).",
-    responses={200: dict, 400: dict, 500: dict}
+    responses={200: dict, 400: dict, 500: dict},
 )
 class GitLabWebhookView(APIView):
     authentication_classes = []
@@ -83,7 +84,7 @@ class GitLabWebhookView(APIView):
             thread_id = project.telegram_message_thread_id
             event_key = f"{project.id}:{gitlab_event}:{branch}:{user_name}"
 
-            user = ProjectUser.objects.filter(project=project, gitlab_username=user_name).first()
+            user = GitlabUser.objects.filter(project=project, gitlab_username=user_name).first()
             mention = f"[{user_name}](tg://user?id={user.telegram_id})" if user else user_name
 
             message = f"🚀 *Event Update:* `{event_type}`\n"
