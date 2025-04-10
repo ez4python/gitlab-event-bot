@@ -1,7 +1,6 @@
-stages:
-  - test
-
 job1:
   stage: test
   script:
     - echo "Pipeline is working!"
+  tags:
+    - docker
