@@ -58,7 +58,7 @@ class GitLabWebhookView(APIView):
                 ref = attr.get('ref') or payload.get('ref')
                 branch = ref.split('/')[-1] if ref else ''
                 status_text = attr.get('status')
-                user_name = payload.get('user', {}).get('username')
+                user_name = payload.get('user', {}).get('name')
                 gitlab_event = 'pipeline'
 
             else:
