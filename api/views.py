@@ -39,6 +39,8 @@ class GitLabWebhookView(APIView):
                 project.webhook_message_thread_id = None
                 project.save()
 
+            full_name = payload.get('user', {}).get('name')
+
             # parse event info
             if event_type == 'Push Hook':
                 branch = payload.get('ref', '').split('/')[-1]
@@ -58,7 +60,7 @@ class GitLabWebhookView(APIView):
                 ref = attr.get('ref') or payload.get('ref')
                 branch = ref.split('/')[-1] if ref else ''
                 status_text = attr.get('status')
-                user_name = payload.get('user', {}).get('name')
+                user_name = payload.get('user', {}).get('username')
                 gitlab_event = 'pipeline'
 
             else:
@@ -85,7 +87,7 @@ class GitLabWebhookView(APIView):
             event_key = f"{project.id}:{gitlab_event}:{branch}:{user_name}"
 
             user = GitlabUser.objects.filter(projects=project, gitlab_username=user_name).first()
-            mention = f"[{user_name}](tg://user?id={user.telegram_id})" if user else user_name
+            mention = f"[`{full_name}`](tg://user?id={user.telegram_id})" if user else full_name
 
             message = f"🚀 *Event Update:* `{event_type}`\n"
             if project.show_project:
