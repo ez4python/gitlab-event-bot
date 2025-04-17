@@ -43,6 +43,7 @@ class GitLabWebhookView(APIView):
             if event_type == 'Push Hook':
                 branch = payload.get('ref', '').split('/')[-1]
                 user_name = payload.get('user_username')
+                user_id = payload.get('user_id')
                 status_text = 'pushed'
                 gitlab_event = 'push'
                 full_name = payload.get('user_name', '')
@@ -51,7 +52,9 @@ class GitLabWebhookView(APIView):
                 attr = payload.get('object_attributes', {})
                 branch = attr.get('source_branch')
                 status_text = attr.get('state')
-                user_name = payload.get('user', {}).get('username')
+                user = payload.get('user', {})
+                user_name = user.get('username')
+                user_id = user.get('id')
                 gitlab_event = 'merge'
                 full_name = payload.get('user', {}).get('name')
 
@@ -60,7 +63,9 @@ class GitLabWebhookView(APIView):
                 ref = attr.get('ref') or payload.get('ref')
                 branch = ref.split('/')[-1] if ref else ''
                 status_text = attr.get('status')
-                user_name = payload.get('user', {}).get('username')
+                user = payload.get('user', {})
+                user_name = user.get('username')
+                user_id = user.get('id')
                 gitlab_event = 'pipeline'
                 full_name = payload.get('user', {}).get('name')
 
@@ -85,7 +90,7 @@ class GitLabWebhookView(APIView):
             # prepare telegram message
             chat_id = project.telegram_chat_id
             thread_id = project.telegram_message_thread_id
-            event_key = f"{project.id}:{gitlab_event}:{branch}:{user_name}"
+            event_key = f"{project.id}:{gitlab_event}:{branch}:{user_id}"
 
             user = GitlabUser.objects.filter(projects=project, gitlab_username=user_name).first()
             mention = f"[`{full_name}`](tg://user?id={user.telegram_id})" if user else full_name
@@ -106,24 +111,20 @@ class GitLabWebhookView(APIView):
             update_statuses = ['created', 'push', 'opened', 'pipeline started', 'pending', 'running']
             final_statuses = ['success', 'failed', 'canceled', 'skipped', 'finished', 'manual']
 
-            msg_id = get_telegram_message_id(event_key)
-
-            if gitlab_event == 'pipeline':
-                if status_text in update_statuses:
-                    if msg_id:
-                        edit_message(chat_id, int(msg_id), message)
-                    else:
-                        sent = send_message(chat_id, thread_id, message)
-                        if sent and 'message_id' in sent:
-                            save_telegram_message_id(event_key, sent['message_id'])
-
-                elif status_text in final_statuses:
-                    if msg_id:
-                        edit_message(chat_id, int(msg_id), message)
-                        delete_telegram_message_id(event_key)
-                    else:
-                        send_message(chat_id, thread_id, message)
-
+            if gitlab_event == 'pipeline' and status_text in update_statuses:
+                msg_id = get_telegram_message_id(event_key)
+                if msg_id:
+                    print('Editing message!')
+                    edit_message(chat_id, int(msg_id), message)
+                else:
+                    print("New message!")
+                    msg = send_message(chat_id, thread_id, message)
+                    save_telegram_message_id(event_key, msg['message_id'])
+            elif gitlab_event == 'pipeline' and status_text in final_statuses:
+                msg_id = get_telegram_message_id(event_key)
+                if msg_id:
+                    edit_message(chat_id, int(msg_id), message)
+                    delete_telegram_message_id(event_key)
             else:
                 send_message(chat_id, thread_id, message)
 

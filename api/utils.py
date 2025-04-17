@@ -1,7 +1,7 @@
 from django.core.cache import cache
 
 
-def save_telegram_message_id(event_key, message_id, timeout=86400):
+def save_telegram_message_id(event_key, message_id, timeout=60 * 60 * 24):
     cache.set(event_key, message_id, timeout=timeout)
 
 
