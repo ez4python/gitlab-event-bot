@@ -1,12 +1,17 @@
+import requests
+from django.http import HttpResponse
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from api.bot import send_message, edit_message
-from api.serializers import GitLabEventSerializer
-from api.utils import save_telegram_message_id, get_telegram_message_id, delete_telegram_message_id
-from apps.models import GitlabProject, GitlabUser
+from api.bot import send_message, edit_message, bot_answer
+from api.serializers import GitLabEventSerializer, TelegramWebhookSerializer
+from api.utils import save_telegram_message_id, get_telegram_message_id, delete_telegram_message_id, parse_group_info
+from apps.models import GitlabProject, GitlabUser, TelegramAdmin, TelegramGroup
+from root.settings import TELEGRAM_BOT_TOKEN, BOT_USERNAME
 
 
 @extend_schema(
@@ -15,7 +20,7 @@ from apps.models import GitlabProject, GitlabUser
     description="GitLab webhook endpoint (faqat push, merge-request va pipeline eventlar uchun).",
     responses={200: dict, 400: dict, 500: dict},
 )
-class GitLabWebhookView(APIView):
+class GitlabWebhookAPIView(APIView):
     authentication_classes = []
     permission_classes = []
 
@@ -130,3 +135,80 @@ class GitLabWebhookView(APIView):
 
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+@extend_schema(
+    request=TelegramWebhookSerializer,
+    methods=["POST"],
+    description="Telegram webhook endpoint for '/start, /stop, /register' commands.",
+    responses={200: dict, 403: dict, 400: dict}
+)
+class TelegramWebhookAPIView(APIView):
+    authentication_classes = []
+    permission_classes = []
+
+    def post(self, request):
+        try:
+            data = request.data
+
+            message = data.get('message') or data.get('edited_message')
+            if not message:
+                return Response({'status': 'no message'}, status=status.HTTP_400_BAD_REQUEST)
+
+            text = message.get('text', '').strip()
+            telegram_user = message.get('from', {})
+            telegram_id = telegram_user.get('id')
+            username = telegram_user.get('username')
+            print(text)
+
+            if not telegram_id or not text:
+                return Response({'status': 'missing telegram id or text'}, status=status.HTTP_400_BAD_REQUEST)
+
+            is_admin = TelegramAdmin.objects.filter(telegram_id=telegram_id).exists()
+            if not is_admin:
+                return Response({'status': 'unauthorized'}, status=status.HTTP_403_FORBIDDEN)
+
+            group_info = parse_group_info(message)
+            if not group_info:
+                return Response({'status': 'not a group chat or not a valid bot command'},
+                                status=status.HTTP_400_BAD_REQUEST)
+
+            if text == f'/register{BOT_USERNAME}':
+                TelegramGroup.objects.update_or_create(
+                    chat_id=group_info['chat_id'],
+                    defaults=group_info
+                )
+                bot_answer(group_info['chat_id'], "✅ Guruh muvaffaqiyatli ro'yxatdan o'tkazildi.")
+                return Response({'status': 'registered'}, status=status.HTTP_200_OK)
+
+            elif text == f'/start{BOT_USERNAME}':
+                bot_answer(group_info['chat_id'], "🤖 Bot ishga tushdi.")
+                return Response({'status': 'started'}, status=status.HTTP_200_OK)
+
+            elif text == f'/stop{BOT_USERNAME}':
+                bot_answer(group_info['chat_id'], "🛑 Bot to‘xtatildi.")
+                return Response({'status': 'stopped'}, status=status.HTTP_200_OK)
+
+            else:
+                return Response({'status': 'unknown command'}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@csrf_exempt
+def set_webhook(request):
+    ngrok_url = 'https://a81f-195-158-16-45.ngrok-free.app/'
+
+    response = requests.post(
+        f'https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/setWebhook',
+        data={'url': ngrok_url + 'api/telegram/webhook/'}
+    )
+
+    if response.status_code == 200:
+        return HttpResponse("Webhook o'rnatildi!", status=200)
+    else:
+        return HttpResponse(f"Xatolik yuz berdi: {response.text}", status=400)

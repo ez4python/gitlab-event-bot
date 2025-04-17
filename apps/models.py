@@ -57,3 +57,39 @@ class GitLabEvent(models.Model):
         verbose_name = 'Event'
         verbose_name_plural = 'Events'
         db_table = 'gitlab_events'
+
+
+class TelegramAdmin(models.Model):
+    telegram_id = models.BigIntegerField(unique=True)
+    full_name = models.CharField(max_length=255)
+    username = models.CharField(max_length=255, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.full_name} (@{self.username})"
+
+    class Meta:
+        verbose_name = 'Admin'
+        verbose_name_plural = 'Admins'
+        db_table = 'telegram_admins'
+
+
+class TelegramGroup(models.Model):
+    chat_id = models.BigIntegerField(unique=True)
+    chat_title = models.CharField(max_length=255)
+    chat_type = models.CharField(max_length=50)
+    username = models.CharField(max_length=255, blank=True, null=True)
+    description = models.TextField(blank=True, null=True)
+
+    message_thread_id = models.BigIntegerField(blank=True, null=True)
+    message_thread_name = models.CharField(max_length=255, blank=True, null=True)
+
+    registered_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.chat_title} ({self.chat_id})"
+
+    class Meta:
+        verbose_name = 'TGroup'
+        verbose_name_plural = 'TGroups'
+        db_table = 'telegram_groups'

@@ -12,6 +12,7 @@ DEBUG = True
 
 # env variables
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+BOT_USERNAME = os.getenv('BOT_USERNAME')
 
 ALLOWED_HOSTS = ['*']
 
