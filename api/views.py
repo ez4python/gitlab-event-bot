@@ -103,8 +103,8 @@ class GitLabWebhookView(APIView):
                 message += f"⏳ *Duration:* `{event_data['duration']}s`\n"
 
             # decide whether to update or send new message
-            update_statuses = ['push', 'opened', 'pipeline started', 'pending', 'running']
-            final_statuses = ['success', 'failed', 'canceled', 'skipped', 'finished']
+            update_statuses = ['created', 'push', 'opened', 'pipeline started', 'pending', 'running']
+            final_statuses = ['success', 'failed', 'canceled', 'skipped', 'finished', 'manual']
 
             if gitlab_event == 'pipeline' and status_text in update_statuses:
                 msg_id = get_telegram_message_id(event_key)
