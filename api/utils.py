@@ -24,13 +24,15 @@ def parse_group_info(message):
     if chat['type'] not in ['group', 'supergroup']:
         return None
 
-    if message.get('text', '').startswith(f'/{BOT_USERNAME}'):
-        group_info = {
-            'chat_id': chat['id'],
-            'chat_name': chat.get('title', 'No Title'),
-            'username': chat.get('username', 'No Username'),
-            'is_forum': chat.get('is_forum', False),
-            'message_thread_id': message.get('message_thread_id', None),
-        }
-        return group_info
-    return None
+    if message.get('text', '').endswith(f'{BOT_USERNAME}'):
+        pass
+        return None
+
+    group_info = {
+        'chat_id': chat['id'],
+        'chat_name': chat.get('title', 'No Title'),
+        'username': chat.get('username', 'No Username'),
+        'is_forum': chat.get('is_forum', False),
+        'message_thread_id': message.get('message_thread_id', None),
+    }
+    return group_info

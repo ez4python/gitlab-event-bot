@@ -1,5 +1,4 @@
 import requests
-from django.http import HttpResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.utils import extend_schema
@@ -11,7 +10,7 @@ from api.bot import send_message, edit_message, bot_answer
 from api.serializers import GitLabEventSerializer, TelegramWebhookSerializer
 from api.utils import save_telegram_message_id, get_telegram_message_id, delete_telegram_message_id, parse_group_info
 from apps.models import GitlabProject, GitlabUser, TelegramAdmin, TelegramGroup
-from root.settings import TELEGRAM_BOT_TOKEN, BOT_USERNAME
+from root.settings import TELEGRAM_BOT_TOKEN, BOT_USERNAME, PROJECT_URL
 
 
 @extend_schema(
@@ -199,16 +198,32 @@ class TelegramWebhookAPIView(APIView):
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@csrf_exempt
-def set_webhook(request):
-    ngrok_url = 'https://a81f-195-158-16-45.ngrok-free.app/'
+@method_decorator(csrf_exempt, name='dispatch')
+@extend_schema(
+    request=None,
+    methods=["POST"],
+    description="Telegram bot uchun webhook URL ni o'rnatadi.",
+    responses={200: dict, 400: dict, 500: dict}
+)
+class SetWebhookAPIView(APIView):
+    authentication_classes = []
+    permission_classes = []
 
-    response = requests.post(
-        f'https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/setWebhook',
-        data={'url': ngrok_url + 'api/telegram/webhook/'}
-    )
+    def post(self, request):
+        try:
+            telegram_webhook_url = f"{PROJECT_URL}/api/telegram/webhook/"
+            response = requests.post(
+                f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/setWebhook",
+                data={'url': telegram_webhook_url}
+            )
 
-    if response.status_code == 200:
-        return HttpResponse("Webhook o'rnatildi!", status=200)
-    else:
-        return HttpResponse(f"Xatolik yuz berdi: {response.text}", status=400)
+            if response.status_code == 200:
+                return Response({"message": "Webhook o'rnatildi!"}, status=status.HTTP_200_OK)
+            else:
+                return Response(
+                    {"error": f"Xatolik yuz berdi: {response.text}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
