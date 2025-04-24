@@ -14,10 +14,10 @@ clean-migrations:
 	rm -rf db.sqlite3
 
 push:
-	git push origin main && git push gitlab main
+	git push github main && git push gitlab main
 
 run:
-	docker start tg_redis
+	docker start postgres_db redis_db
 
 check-keys:
 	 docker exec -it tg_redis redis-cli keys '*'
