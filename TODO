@@ -29,3 +29,5 @@ TASKS:
     1. add bot-commands(register, start, stop) to register 'group_id & topic_id', start and stop message sending.
     2. action to sync all group users(update or create)
     3. merge request event(source, target branches)
+    4. event statuslar
+

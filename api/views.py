@@ -15,7 +15,7 @@ from root.settings import TELEGRAM_BOT_TOKEN, BOT_USERNAME, PROJECT_URL
 
 @extend_schema(
     request=GitLabEventSerializer,
-    methods=["POST"],
+    methods=['POST'],
     description="GitLab webhook endpoint (faqat push, merge-request va pipeline eventlar uchun).",
     responses={200: dict, 400: dict, 500: dict},
 )
@@ -139,9 +139,9 @@ class GitlabWebhookAPIView(APIView):
 @method_decorator(csrf_exempt, name='dispatch')
 @extend_schema(
     request=TelegramWebhookSerializer,
-    methods=["POST"],
+    methods=['POST'],
     description="Telegram webhook endpoint for '/start, /stop, /register' commands.",
-    responses={200: dict, 403: dict, 400: dict}
+    responses={200: dict}
 )
 class TelegramWebhookAPIView(APIView):
     authentication_classes = []
@@ -149,29 +149,23 @@ class TelegramWebhookAPIView(APIView):
 
     def post(self, request):
         try:
-            data = request.data
+            serializer = TelegramWebhookSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            data = serializer.validated_data
 
             message = data.get('message') or data.get('edited_message')
-            if not message:
-                return Response({'status': 'no message'}, status=status.HTTP_400_BAD_REQUEST)
-
             text = message.get('text', '').strip()
             telegram_user = message.get('from', {})
             telegram_id = telegram_user.get('id')
-            username = telegram_user.get('username')
-            print(text)
-
-            if not telegram_id or not text:
-                return Response({'status': 'missing telegram id or text'}, status=status.HTTP_400_BAD_REQUEST)
 
             is_admin = TelegramAdmin.objects.filter(telegram_id=telegram_id).exists()
             if not is_admin:
-                return Response({'status': 'unauthorized'}, status=status.HTTP_403_FORBIDDEN)
+                return Response({'status': 'unauthorized'}, status=status.HTTP_200_OK)
 
             group_info = parse_group_info(message)
             if not group_info:
                 return Response({'status': 'not a group chat or not a valid bot command'},
-                                status=status.HTTP_400_BAD_REQUEST)
+                                status=status.HTTP_200_OK)
 
             if text == f'/register{BOT_USERNAME}':
                 TelegramGroup.objects.update_or_create(
@@ -189,21 +183,20 @@ class TelegramWebhookAPIView(APIView):
                 bot_answer(group_info['chat_id'], "🛑 Bot to‘xtatildi.")
                 return Response({'status': 'stopped'}, status=status.HTTP_200_OK)
 
-            else:
-                return Response({'status': 'unknown command'}, status=status.HTTP_200_OK)
+            return Response({'status': 'unknown command'}, status=status.HTTP_200_OK)
 
         except Exception as e:
             import traceback
             traceback.print_exc()
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'error': str(e)}, status=status.HTTP_200_OK)
 
 
 @method_decorator(csrf_exempt, name='dispatch')
 @extend_schema(
     request=None,
-    methods=["POST"],
+    methods=['POST'],
     description="Telegram bot uchun webhook URL ni o'rnatadi.",
-    responses={200: dict, 400: dict, 500: dict}
+    responses={200: dict}
 )
 class SetWebhookAPIView(APIView):
     authentication_classes = []
@@ -211,19 +204,18 @@ class SetWebhookAPIView(APIView):
 
     def post(self, request):
         try:
-            telegram_webhook_url = f"{PROJECT_URL}/api/telegram/webhook/"
-            response = requests.post(
-                f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/setWebhook",
-                data={'url': telegram_webhook_url}
+            webhook_url = f"{PROJECT_URL}/api/telegram/webhook/"
+            telegram_api_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/setWebhook"
+
+            response = requests.post(telegram_api_url, data={'url': webhook_url})
+
+            if response.ok:
+                return Response({"message": "Webhook o'rnatildi!"}, status=status.HTTP_200_OK)
+
+            return Response(
+                {"error": f"Xatolik yuz berdi: {response.text}"},
+                status=status.HTTP_200_OK
             )
 
-            if response.status_code == 200:
-                return Response({"message": "Webhook o'rnatildi!"}, status=status.HTTP_200_OK)
-            else:
-                return Response(
-                    {"error": f"Xatolik yuz berdi: {response.text}"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
         except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'error': str(e)}, status=status.HTTP_200_OK)

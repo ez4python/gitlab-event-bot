@@ -1,19 +1,19 @@
 import requests
-import json
 
-# Load JSON data from file
-with open('hooks/pipeline-hook.json', 'r') as file:
-    json_data = json.load(file)
+bot_token = '6408363442:AAF5uLREzdhR--YLK_bocO-aMKRdAZYKgJ4'
+chat_id = '-1002585594120'  # Replace with the group chat ID or username
+url = f"https://api.telegram.org/bot{bot_token}/getChatMembers"
 
-headers = {
-    'Content-Type': 'application/json',
-    'X-Gitlab-Event': 'Pipeline Hook'
+params = {
+    'chat_id': chat_id
 }
 
-response = requests.post('http://127.0.0.1:8000/api/gitlab/webhook/', json=json_data, headers=headers)
+response = requests.get(url, params=params)
 
-try:
-    print(response.status_code)
-    print(response.json())
-except ValueError:
-    print("Response is not a valid JSON:", response.text)
+if response.status_code == 200:
+    members = response.json()
+    for member in members['result']:
+        print(f"User: {member['user']['username']}, ID: {member['user']['id']}")
+else:
+    print(response)
+    print(f"Failed to fetch members. Status code: {response.status_code}")

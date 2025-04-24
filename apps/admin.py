@@ -4,7 +4,16 @@ from apps.models import GitlabProject, GitlabUser, GitLabEvent, TelegramGroup, T
 
 @admin.register(GitlabProject)
 class GitlabProjectAdmin(admin.ModelAdmin):
-    list_display = ('name', 'telegram_chat_id')
+    list_display = (
+        'name',
+        'telegram_group',
+        'telegram_group_id',
+        'show_user',
+        'show_branch',
+        'show_project',
+        'show_duration',
+        'show_status',
+    )
 
 
 @admin.register(GitlabUser)
@@ -25,4 +34,13 @@ class TelegramAdminAdmin(admin.ModelAdmin):
 
 @admin.register(TelegramGroup)
 class TelegramGroupAdmin(admin.ModelAdmin):
-    list_display = ('chat_id', 'chat_title', 'chat_type', 'registered_at')
+    list_display = (
+        'chat_id',
+        'chat_name',
+        'chat_type',
+        'username',
+        'message_thread_id',
+        'message_thread_name',
+        'registered_at',
+    )
+    search_fields = ('chat_name', 'chat_id', 'username')

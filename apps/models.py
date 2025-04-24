@@ -4,8 +4,14 @@ from django.db import models
 class GitlabProject(models.Model):
     name = models.CharField(max_length=255, unique=True)
 
-    telegram_chat_id = models.CharField(max_length=50, blank=True, null=True)
-    telegram_message_thread_id = models.IntegerField(blank=True, null=True)
+    telegram_group = models.ForeignKey(
+        'apps.TelegramGroup',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='projects'
+    )
+
     show_user = models.BooleanField(default=True)
     show_project = models.BooleanField(default=True)
     show_branch = models.BooleanField(default=True)
@@ -24,7 +30,7 @@ class GitlabProject(models.Model):
 class GitlabUser(models.Model):
     gitlab_username = models.CharField(max_length=255, unique=True)
     telegram_id = models.CharField(max_length=50)
-    projects = models.ManyToManyField(GitlabProject, related_name='users')
+    projects = models.ManyToManyField('apps.GitlabProject', related_name='users')
 
     def __str__(self):
         return self.gitlab_username
@@ -43,7 +49,7 @@ class GitLabEvent(models.Model):
     )
 
     gitlab_event = models.CharField(max_length=20, choices=EVENT_CHOICES)
-    project = models.ForeignKey(to=GitlabProject, on_delete=models.CASCADE, related_name='events')
+    project = models.ForeignKey('apps.GitlabProject', on_delete=models.CASCADE, related_name='events')
     status = models.CharField(max_length=50)
     branch = models.CharField(max_length=100)
     user_name = models.CharField(max_length=255)
@@ -76,20 +82,20 @@ class TelegramAdmin(models.Model):
 
 class TelegramGroup(models.Model):
     chat_id = models.BigIntegerField(unique=True)
-    chat_title = models.CharField(max_length=255)
+    chat_name = models.CharField(max_length=255)
     chat_type = models.CharField(max_length=50)
     username = models.CharField(max_length=255, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
-
+    is_forum = models.BooleanField(default=False)
     message_thread_id = models.BigIntegerField(blank=True, null=True)
     message_thread_name = models.CharField(max_length=255, blank=True, null=True)
-
+    is_active = models.BooleanField(default=False)
     registered_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.chat_title} ({self.chat_id})"
+        return f"{self.chat_name} ({self.chat_id})"
 
     class Meta:
-        verbose_name = 'TGroup'
-        verbose_name_plural = 'TGroups'
+        verbose_name = 'Telegram Group'
+        verbose_name_plural = 'Telegram Groups'
         db_table = 'telegram_groups'
