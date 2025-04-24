@@ -21,4 +21,3 @@ run:
 
 check-keys:
 	 docker exec -it tg_redis redis-cli keys '*'
-
