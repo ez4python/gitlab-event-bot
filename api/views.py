@@ -1,4 +1,5 @@
 import requests
+from django.core.cache import cache
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.utils import extend_schema
@@ -163,6 +164,29 @@ class TelegramWebhookAPIView(APIView):
                 return Response({'status': 'unauthorized'}, status=status.HTTP_200_OK)
 
             group_info = parse_group_info(message)
+
+            if group_info['chat_type'] == 'private':
+                if cache.get(f'waiting_username_{telegram_id}'):
+                    gitlab_username = text
+
+                    if GitlabUser.objects.filter(gitlab_username=gitlab_username).exists():
+                        bot_answer(telegram_id, "ℹ️ Siz allaqachon ro'yxatdan o'tgansiz.")
+                        cache.delete(f'waiting_username_{telegram_id}')
+                        return Response({'status': 'already registered'}, status=status.HTTP_200_OK)
+
+                    GitlabUser.objects.create(
+                        gitlab_username=gitlab_username,
+                        telegram_id=telegram_id
+                    )
+                    bot_answer(telegram_id, "✅ Ro'yxatdan muvaffaqiyatli o'tdingiz!")
+                    cache.delete(f'waiting_username_{telegram_id}')
+                    return Response({'status': 'registered'}, status=status.HTTP_200_OK)
+
+                if text == '/start':
+                    cache.set(f'waiting_username_{telegram_id}', True, timeout=300)
+                    bot_answer(telegram_id, "🔑 Iltimos, GitLab username'ingizni yuboring.")
+                    return Response({'status': 'asking for username'}, status=status.HTTP_200_OK)
+
             if not group_info:
                 return Response({'status': 'not a group chat or not a valid bot command'},
                                 status=status.HTTP_200_OK)

@@ -27,7 +27,7 @@ def parse_group_info(message):
         'chat_name': chat.get('title'),
         'username': chat.get('username', 'No Username'),
         'is_forum': chat.get('is_forum', False),
-        'message_thread_id': message.get('message_thread_id', None),
+        'message_thread_id': message.get('message_thread_id') or chat.get('message_thread_id'),
         'chat_type': chat.get('type', '')
     }
     return group_info
