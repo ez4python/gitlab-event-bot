@@ -17,8 +17,8 @@ push:
 	git push github main && git push gitlab main
 
 run:
-	docker start postgres_db redis_db
+	docker start redis_db
 
 check-keys:
-	 docker exec -it tg_redis redis-cli keys '*'
+	 docker exec -it redis_db redis-cli keys '*'
 
