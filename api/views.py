@@ -165,10 +165,17 @@ class TelegramWebhookAPIView(APIView):
                 if cache.get(f'waiting_username_{telegram_id}'):
                     gitlab_username = text
 
-                    if GitlabUser.objects.filter(gitlab_username=gitlab_username).exists():
+                    # looking for telegram_id
+                    if GitlabUser.objects.filter(telegram_id=telegram_id).exists():
                         bot_answer(telegram_id, "ℹ️ Siz allaqachon ro'yxatdan o'tgansiz.")
                         cache.delete(f'waiting_username_{telegram_id}')
                         return Response({'status': 'already registered'}, status=status.HTTP_200_OK)
+
+                    # looking ofr gitlab_username
+                    if GitlabUser.objects.filter(gitlab_username=gitlab_username).exists():
+                        bot_answer(telegram_id, "❗️Bu GitLab username allaqachon ishlatilgan.")
+                        cache.delete(f'waiting_username_{telegram_id}')
+                        return Response({'status': 'username taken'}, status=status.HTTP_200_OK)
 
                     GitlabUser.objects.create(
                         gitlab_username=gitlab_username,
