@@ -159,13 +159,9 @@ class TelegramWebhookAPIView(APIView):
             telegram_user = message.get('from', {})
             telegram_id = telegram_user.get('id')
 
-            is_admin = TelegramAdmin.objects.filter(telegram_id=telegram_id).exists()
-            if not is_admin:
-                return Response({'status': 'unauthorized'}, status=status.HTTP_200_OK)
+            chat_type = message['chat'].get('type', '')
 
-            group_info = parse_group_info(message)
-
-            if group_info['chat_type'] == 'private':
+            if chat_type == 'private':
                 if cache.get(f'waiting_username_{telegram_id}'):
                     gitlab_username = text
 
@@ -186,6 +182,12 @@ class TelegramWebhookAPIView(APIView):
                     cache.set(f'waiting_username_{telegram_id}', True, timeout=300)
                     bot_answer(telegram_id, "🔑 Iltimos, GitLab username'ingizni yuboring.")
                     return Response({'status': 'asking for username'}, status=status.HTTP_200_OK)
+
+            is_admin = TelegramAdmin.objects.filter(telegram_id=telegram_id).exists()
+            if not is_admin:
+                return Response({'status': 'unauthorized'}, status=status.HTTP_200_OK)
+
+            group_info = parse_group_info(message)
 
             if not group_info:
                 return Response({'status': 'not a group chat or not a valid bot command'},
