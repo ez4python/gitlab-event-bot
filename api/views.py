@@ -93,6 +93,7 @@ class GitlabWebhookAPIView(APIView):
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
             # prepare telegram message
+            # todo
             chat_id = project.telegram_chat_id
             thread_id = project.telegram_message_thread_id
             event_key = f"{project.id}:{gitlab_event}:{branch}:{user_id}"
@@ -200,7 +201,7 @@ class TelegramWebhookAPIView(APIView):
                 return Response({'status': 'not a group chat or not a valid bot command'},
                                 status=status.HTTP_200_OK)
 
-            if text == f'/register{BOT_USERNAME}':
+            if text.startswith('/register'):
                 TelegramGroup.objects.update_or_create(
                     chat_id=group_info['chat_id'],
                     defaults=group_info
@@ -208,11 +209,11 @@ class TelegramWebhookAPIView(APIView):
                 bot_answer(group_info['chat_id'], "✅ Guruh muvaffaqiyatli ro'yxatdan o'tkazildi.")
                 return Response({'status': 'registered'}, status=status.HTTP_200_OK)
 
-            elif text == f'/start{BOT_USERNAME}':
+            elif text.startswith('/start'):
                 bot_answer(group_info['chat_id'], "🤖 Bot ishga tushdi.")
                 return Response({'status': 'started'}, status=status.HTTP_200_OK)
 
-            elif text == f'/stop{BOT_USERNAME}':
+            elif text.startswith('/stop'):
                 bot_answer(group_info['chat_id'], "🛑 Bot to‘xtatildi.")
                 return Response({'status': 'stopped'}, status=status.HTTP_200_OK)
 

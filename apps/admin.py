@@ -2,6 +2,13 @@ from django.contrib import admin
 from apps.models import GitlabProject, GitlabUser, GitLabEvent, TelegramGroup, TelegramAdmin
 
 
+class GitlabUserInline(admin.TabularInline):
+    model = GitlabUser.projects.through
+    extra = 0
+    verbose_name = "Gitlab-User"
+    verbose_name_plural = "Gitlab-Users"
+
+
 @admin.register(GitlabProject)
 class GitlabProjectAdmin(admin.ModelAdmin):
     list_display = (
@@ -14,6 +21,7 @@ class GitlabProjectAdmin(admin.ModelAdmin):
         'show_duration',
         'show_status',
     )
+    inlines = [GitlabUserInline]
 
 
 @admin.register(GitlabUser)

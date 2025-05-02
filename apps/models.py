@@ -75,8 +75,8 @@ class TelegramAdmin(models.Model):
         return f"{self.full_name} (@{self.username})"
 
     class Meta:
-        verbose_name = 'Admin'
-        verbose_name_plural = 'Admins'
+        verbose_name = 'TelegramAdmin'
+        verbose_name_plural = 'TelegramAdmins'
         db_table = 'telegram_admins'
 
 
