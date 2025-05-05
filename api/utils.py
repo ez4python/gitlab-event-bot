@@ -1,5 +1,7 @@
 from django.core.cache import cache
 
+from apps.models import GitlabUser
+
 
 def save_telegram_message_id(event_key, message_id, timeout=60 * 60 * 24):
     cache.set(event_key, message_id, timeout=timeout)
@@ -31,3 +33,11 @@ def parse_group_info(message):
         'chat_type': chat.get('type', '')
     }
     return group_info
+
+
+def get_gitlab_mention(username, full_name):
+    try:
+        user = GitlabUser.objects.get(gitlab_username=username)
+        return f"[{full_name}](tg://user?id={user.telegram_id})"
+    except GitlabUser.DoesNotExist:
+        return full_name

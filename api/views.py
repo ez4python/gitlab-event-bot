@@ -9,7 +9,8 @@ from rest_framework.views import APIView
 
 from api.bot import send_message, edit_message, bot_answer
 from api.serializers import GitLabEventSerializer, TelegramWebhookSerializer
-from api.utils import save_telegram_message_id, get_telegram_message_id, delete_telegram_message_id, parse_group_info
+from api.utils import save_telegram_message_id, get_telegram_message_id, delete_telegram_message_id, parse_group_info, \
+    get_gitlab_mention
 from apps.models import GitlabProject, GitlabUser, TelegramAdmin, TelegramGroup
 from root.settings import TELEGRAM_BOT_TOKEN, BOT_USERNAME, PROJECT_URL
 
@@ -54,14 +55,27 @@ class GitlabWebhookAPIView(APIView):
                 full_name = payload.get('user_name', '')
 
             elif event_type == 'Merge Request Hook':
-                attr = payload.get('object_attributes', {})
-                branch = attr.get('source_branch')
-                status_text = attr.get('state')
+                object_attributes = payload.get('object_attributes', {})
+                branch = object_attributes.get('source_branch')
+                status_text = object_attributes.get('state')
                 user = payload.get('user', {})
                 user_name = user.get('username')
                 user_id = user.get('id')
                 gitlab_event = 'merge'
                 full_name = payload.get('user', {}).get('name')
+                target_branch = object_attributes.get('target_branch')
+                draft = object_attributes.get('draft')
+                assignees = ({
+                    'id': assignee.get('id'),
+                    'name': assignee.get('name'),
+                    'username': assignee.get('username')
+                } for assignee in payload.get('assignees', []))
+                reviewers = ({
+                    'id': reviewer.get('id'),
+                    'name': reviewer.get('name'),
+                    'username': reviewer.get('username')
+                } for reviewer in payload.get('reviewers', []))
+
 
             elif event_type == 'Pipeline Hook':
                 attr = payload.get('object_attributes', {})
@@ -102,16 +116,48 @@ class GitlabWebhookAPIView(APIView):
             mention = f"[`{full_name}`](tg://user?id={user.telegram_id})" if user else full_name
 
             message = f"🚀 *Event Update:* `{event_type}`\n"
-            if project.show_project:
-                message += f"🎯 *Project:* `{project.name}`\n"
-            if project.show_status:
-                message += f"📌 *Status:* `{status_text}`\n"
-            if project.show_branch:
-                message += f"🌿 *Branch:* `{branch}`\n"
-            if project.show_user:
-                message += f"👤 *User:* {mention}\n"
-            if project.show_duration:
-                message += f"⏳ *Duration:* `{event_data['duration']}s`\n"
+            if gitlab_event in ['push', 'pipeline']:
+                if project.show_project:
+                    message += f"📣 *Project:* `{project.name}`\n"
+                if project.show_status:
+                    message += f"📌 *Status:* `{status_text}`\n"
+                if project.show_branch:
+                    message += f"🌿 *Branch:* `{branch}`\n"
+                if project.show_user:
+                    message += f"👤 *User:* {mention}\n"
+                if project.show_duration:
+                    message += f"⏳ *Duration:* `{event_data['duration']}s`\n"
+
+            if gitlab_event == 'merge':
+
+                assignee_mentions = [
+                    get_gitlab_mention(a.get('username'), a.get('name')) for a in assignees
+                ]
+                reviewer_mentions = [
+                    get_gitlab_mention(r.get('username'), r.get('name')) for r in reviewers
+                ]
+
+                if project.show_project:
+                    message += f"📣 *Project:* `{project.name}`\n"
+                    message += f"📑 *Is Draft:* `{draft}`\n"
+                if project.show_status:
+                    message += f"📌 *Status:* `{status_text}`\n"
+                if project.show_branch:
+                    message += f"🌿 *Source:* `{branch}`\n"
+                    message += f"🎯 *Target:* `{target_branch}`\n"
+                if project.show_user:
+                    message += f"👤 *User:* {mention}\n"
+                    if assignee_mentions:
+                        message += "👥 *Assignees*\n"
+                        for assignee in assignee_mentions:
+                            message += f"  • {assignee}\n"
+                    if reviewer_mentions:
+                        message += "👁 *Reviewers:*\n"
+                        for reviewer in reviewer_mentions:
+                            message += f"  • {reviewer}\n"
+
+                if project.show_duration:
+                    message += f"⏳ *Duration:* `{event_data['duration']}s`\n"
 
             # decide whether to update or send new message
             update_statuses = ['created', 'push', 'opened', 'pipeline started', 'pending', 'running']
