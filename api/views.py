@@ -94,8 +94,8 @@ class GitlabWebhookAPIView(APIView):
 
             # prepare telegram message
             # todo
-            chat_id = project.telegram_chat_id
-            thread_id = project.telegram_message_thread_id
+            chat_id = project.telegram_group.chat_id
+            thread_id = project.telegram_group.message_thread_id
             event_key = f"{project.id}:{gitlab_event}:{branch}:{user_id}"
 
             user = GitlabUser.objects.filter(projects=project, gitlab_username=user_name).first()
