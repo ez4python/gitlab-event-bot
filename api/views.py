@@ -87,6 +87,7 @@ class GitlabWebhookAPIView(APIView):
                 user_id = user.get('id')
                 gitlab_event = 'pipeline'
                 full_name = payload.get('user', {}).get('name')
+                event_id = attr.get('id')
 
             else:
                 return Response({'status': 'ignored'}, status=status.HTTP_200_OK)
@@ -107,10 +108,11 @@ class GitlabWebhookAPIView(APIView):
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
             # prepare telegram message
-            # todo
             chat_id = project.telegram_group.chat_id
             thread_id = project.telegram_group.message_thread_id
-            event_key = f"{project.id}:{gitlab_event}:{branch}:{user_id}"
+
+            if gitlab_event in ['merge', 'pipeline']:
+                event_key = f"{event_id}:{gitlab_event}:{branch}"
 
             user = GitlabUser.objects.filter(projects=project, gitlab_username=user_name).first()
             mention = f"[`{full_name}`](tg://user?id={user.telegram_id})" if user else full_name
@@ -160,17 +162,20 @@ class GitlabWebhookAPIView(APIView):
                     message += f"⏳ *Duration:* `{event_data['duration']}s`\n"
 
             # decide whether to update or send new message
-            update_statuses = ['created', 'push', 'opened', 'pipeline started', 'pending', 'running']
-            final_statuses = ['success', 'failed', 'canceled', 'skipped', 'finished', 'manual']
+            update_statuses = ['created', 'push', 'opened', 'pipeline started', 'pending', 'running', 'open',
+                               'close', 'reopen', 'update']
+            final_statuses = ['success', 'failed', 'canceled', 'skipped', 'finished', 'manual', 'approved',
+                              'unapproved', 'approval', 'unapproval', 'merge']
 
-            if gitlab_event == 'pipeline' and status_text in update_statuses:
+            print(f"EVENT_KEY: {event_key}, MSG_ID in Redis: {get_telegram_message_id(event_key)}")
+            if gitlab_event in ['merge', 'pipeline'] and status_text in update_statuses:
                 msg_id = get_telegram_message_id(event_key)
                 if msg_id:
                     edit_message(chat_id, int(msg_id), message)
                 else:
                     msg = send_message(chat_id, thread_id, message)
                     save_telegram_message_id(event_key, msg['message_id'])
-            elif gitlab_event == 'pipeline' and status_text in final_statuses:
+            elif gitlab_event in ['merge', 'pipeline'] and status_text in final_statuses:
                 msg_id = get_telegram_message_id(event_key)
                 if msg_id:
                     edit_message(chat_id, int(msg_id), message)
