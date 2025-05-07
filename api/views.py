@@ -75,6 +75,7 @@ class GitlabWebhookAPIView(APIView):
                     'name': reviewer.get('name'),
                     'username': reviewer.get('username')
                 } for reviewer in payload.get('reviewers', []))
+                event_id = object_attributes.get('id')
 
 
             elif event_type == 'Pipeline Hook':
