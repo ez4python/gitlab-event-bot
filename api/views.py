@@ -1,3 +1,5 @@
+import time
+
 import requests
 from django.core.cache import cache
 from django.utils.decorators import method_decorator
@@ -12,7 +14,7 @@ from api.serializers import GitLabEventSerializer, TelegramWebhookSerializer
 from api.utils import save_telegram_message_id, get_telegram_message_id, delete_telegram_message_id, parse_group_info, \
     get_gitlab_mention
 from apps.models import GitlabProject, GitlabUser, TelegramAdmin, TelegramGroup
-from root.settings import TELEGRAM_BOT_TOKEN, BOT_USERNAME, PROJECT_URL
+from root.settings import TELEGRAM_BOT_TOKEN, PROJECT_URL
 
 
 @extend_schema(
@@ -76,7 +78,7 @@ class GitlabWebhookAPIView(APIView):
                     'username': reviewer.get('username')
                 } for reviewer in payload.get('reviewers', []))
                 event_id = object_attributes.get('id')
-
+                action = object_attributes.get('action')
 
             elif event_type == 'Pipeline Hook':
                 attr = payload.get('object_attributes', {})
@@ -119,11 +121,36 @@ class GitlabWebhookAPIView(APIView):
             mention = f"[`{full_name}`](tg://user?id={user.telegram_id})" if user else full_name
 
             message = f"🚀 *Event Update:* `{event_type}`\n"
+            status_emoji_map = {
+                'pushed': '✅',
+                'opened': '✨',
+                'pending': '⏳',
+                'running': '🏃',
+                'success': '🟢',
+                'failed': '🔴',
+                'canceled': '⚪',
+                'skipped': '⏭️',
+                'finished': '🏁',
+                'manual': '✋',
+                'approved': '👍',
+                'unapproved': '👎',
+                'approval': '✅',
+                'unapproval': '❌',
+                'merge': '🤝',
+                'pipeline started': '⏱️',
+                'open': '🔓',
+                'close': '🔒',
+                'reopen': '🔄',
+                'update': '📝',
+                'closed': '🔒',
+            }
+            status_with_emoji = f"{status_text} {status_emoji_map.get(status_text, '')}"
+
             if gitlab_event in ['push', 'pipeline']:
                 if project.show_project:
                     message += f"📣 *Project:* `{project.name}`\n"
                 if project.show_status:
-                    message += f"📌 *Status:* `{status_text}`\n"
+                    message += f"📌 *Status:* `{status_with_emoji}`\n"
                 if project.show_branch:
                     message += f"🌿 *Branch:* `{branch}`\n"
                 if project.show_user:
@@ -144,7 +171,7 @@ class GitlabWebhookAPIView(APIView):
                     message += f"📣 *Project:* `{project.name}`\n"
                     message += f"📑 *Is Draft:* `{draft}`\n"
                 if project.show_status:
-                    message += f"📌 *Status:* `{status_text}`\n"
+                    message += f"📌 *Status:* `{status_with_emoji}`\n"
                 if project.show_branch:
                     message += f"🌿 *Source:* `{branch}`\n"
                     message += f"🎯 *Target:* `{target_branch}`\n"
@@ -164,28 +191,67 @@ class GitlabWebhookAPIView(APIView):
 
             # decide whether to update or send new message
             update_statuses = ['created', 'push', 'opened', 'pipeline started', 'pending', 'running', 'open',
-                               'close', 'reopen', 'update']
-            final_statuses = ['success', 'failed', 'canceled', 'skipped', 'finished', 'manual', 'approved',
-                              'unapproved', 'approval', 'unapproval', 'merge']
+                               'close', 'reopen', 'update', 'approved', 'unapproved', 'approval', 'unapproval']
+            final_statuses = ['success', 'failed', 'canceled', 'skipped', 'finished', 'manual', 'merge']
 
-            if gitlab_event in ['merge', 'pipeline'] and status_text in update_statuses:
+            if gitlab_event == 'merge':
+                event_key = f"{event_id}:{gitlab_event}:{branch}"
                 msg_id = get_telegram_message_id(event_key)
-                print('Message ID:', msg_id)
                 if msg_id:
                     edit_message(chat_id, int(msg_id), message)
-                    print('Status: edited')
+                    if status_text in final_statuses or action == 'merge':
+                        delete_telegram_message_id(event_key)
                 else:
                     msg = send_message(chat_id, thread_id, message)
                     save_telegram_message_id(event_key, msg['message_id'])
-                    print('Status: created')
-            elif gitlab_event in ['merge', 'pipeline'] and status_text in final_statuses:
-                msg_id = get_telegram_message_id(event_key)
-                if msg_id:
-                    print('Message ID:', msg_id)
-                    edit_message(chat_id, int(msg_id), message)
-                    delete_telegram_message_id(event_key)
-                    print('Status: edited and deleted')
-            else:
+                    if status_text in final_statuses or action == 'merge':
+                        delete_telegram_message_id(event_key)
+                time.sleep(0.5)
+            elif gitlab_event == 'pipeline':
+                cached_status = cache.get(f"pipeline_status:{event_key}")
+
+                if status_text == 'pending':
+                    cache.set(f"pipeline_status:{event_key}", {'status': status_text, 'duration': 0}, timeout=60)
+                    return Response({'status': 'pending status cached'}, status=status.HTTP_200_OK)
+                elif cached_status and cached_status['status'] == 'pending' and status_text in ['running', 'success',
+                                                                                                'failed', 'canceled',
+                                                                                                'skipped', 'finished',
+                                                                                                'manual']:
+                    cached_data = cache.get(f"pipeline_status:{event_key}")
+                    pending_message = f"🚀 *Event Update:* `Pipeline Hook`\n"
+                    if project.show_project:
+                        pending_message += f"📣 *Project:* `{project.name}`\n"
+                    if project.show_status:
+                        pending_message += f"📌 *Status:* `pending` {status_emoji_map.get('pending', '')}\n"
+                    if project.show_branch:
+                        pending_message += f"🌿 *Branch:* `{branch}`\n"
+                    if project.show_user:
+                        pending_message += f"👤 *User:* {mention}\n"
+                    if project.show_duration and cached_data and 'duration' in cached_data:
+                        pending_message += f"⏳ *Duration:* `{cached_data['duration']}s`\n"
+
+                    # Endi yangi statusni qo'shamiz
+                    updated_message = f"{pending_message.rstrip()}\n📌 *Status:* `{status_with_emoji}`"
+                    if project.show_duration:
+                        updated_message += f"\n⏳ *Duration:* `{event_data['duration']}s`"
+
+                    msg_id = get_telegram_message_id(event_key)
+                    if msg_id:
+                        edit_message(chat_id, int(msg_id), updated_message)
+                    else:
+                        msg = send_message(chat_id, thread_id, updated_message)
+                        save_telegram_message_id(event_key, msg['message_id'])
+                    cache.delete(f"pipeline_status:{event_key}")
+                    return Response({'status': f'pending and {status_text} sent'}, status=status.HTTP_200_OK)
+                else:
+                    msg_id = get_telegram_message_id(event_key)
+                    if msg_id:
+                        edit_message(chat_id, int(msg_id), message)
+                    else:
+                        msg = send_message(chat_id, thread_id, message)
+                        save_telegram_message_id(event_key, msg['message_id'])
+                    return Response({'status': f'{status_text} sent'}, status=status.HTTP_200_OK)
+            elif gitlab_event == 'push':
                 send_message(chat_id, thread_id, message)
 
             return Response({'status': 'ok'}, status=status.HTTP_200_OK)
@@ -266,11 +332,21 @@ class TelegramWebhookAPIView(APIView):
                 return Response({'status': 'registered'}, status=status.HTTP_200_OK)
 
             elif text.startswith('/start'):
-                bot_answer(group_info['chat_id'], "🤖 Bot ishga tushdi.")
+                group_obj = TelegramGroup.objects.get(chat_id=group_info['chat_id'])
+                if group_obj.is_active:
+                    bot_answer(group_info['chat_id'], "🤖 Bot allaqachon ishga tushgan.")
+                else:
+                    TelegramGroup.objects.filter(chat_id=group_info['chat_id']).update(is_active=True)
+                    bot_answer(group_info['chat_id'], "🤖 Bot ishga tushdi.")
                 return Response({'status': 'started'}, status=status.HTTP_200_OK)
 
             elif text.startswith('/stop'):
-                bot_answer(group_info['chat_id'], "🛑 Bot to‘xtatildi.")
+                group_obj = TelegramGroup.objects.get(chat_id=group_info['chat_id'])
+                if not group_obj.is_active:
+                    TelegramGroup.objects.filter(chat_id=group_info['chat_id']).update(is_active=False)
+                    bot_answer(group_info['chat_id'], "🛑 Bot to‘xtatildi.")
+                else:
+                    bot_answer(group_info['chat_id'], "🛑 Bot allaqachon to'xtatilgan.")
                 return Response({'status': 'stopped'}, status=status.HTTP_200_OK)
 
             return Response({'status': 'unknown command'}, status=status.HTTP_200_OK)

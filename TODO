@@ -31,3 +31,6 @@ TASKS:
     3. merge request event(source, target branches)
     4. event statuses
 
+    1. merger request link
+    2. change sticker
+    3. to postgres
