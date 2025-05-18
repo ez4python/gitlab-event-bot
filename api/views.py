@@ -64,6 +64,7 @@ class GitlabWebhookAPIView(APIView):
                 user_name = user.get('username')
                 user_id = user.get('id')
                 gitlab_event = 'merge'
+                merge_url = object_attributes.get('url')
                 full_name = payload.get('user', {}).get('name')
                 target_branch = object_attributes.get('target_branch')
                 draft = object_attributes.get('draft')
@@ -185,6 +186,7 @@ class GitlabWebhookAPIView(APIView):
                         message += "👁 *Reviewers:*\n"
                         for reviewer in reviewer_mentions:
                             message += f"  • {reviewer}\n"
+                message += f"🔗 *Link:* [tap to view]({merge_url})\n"
 
                 if project.show_duration:
                     message += f"⏳ *Duration:* `{event_data['duration']}s`\n"
