@@ -118,8 +118,8 @@ class GitlabWebhookAPIView(APIView):
             if gitlab_event in ['merge', 'pipeline']:
                 event_key = f"{event_id}:{gitlab_event}:{branch}"
 
-            user = GitlabUser.objects.filter(projects=project, gitlab_username=user_id).first()
-            mention = f"[`{full_name}`](tg://user?id={user.telegram_id})" if user else full_name
+            user = GitlabUser.objects.filter(gitlab_id=user_id).first()
+            mention = f"[{full_name}](tg://user?id={user.telegram_id})" if user else full_name
 
             message = f"🚀 *Event Update:* `{event_type}`\n"
             status_emoji_map = {

@@ -32,7 +32,6 @@ A Django application that receives GitLab webhook events and forwards them to a 
 2. Navigate to "Webhooks"
 3. Add a new webhook with the following settings:
    - URL: `https://your-domain.com/api/gitlab/webhook/`
-   - Secret Token: The same value as `GITLAB_WEBHOOK_SECRET_TOKEN` in your `.env` file
    - Select only these events:
      - Push events
      - Merge request events
