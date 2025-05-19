@@ -38,7 +38,7 @@ class GitlabWebhookAPIView(APIView):
             # get project name directly from payload
             project_name = payload.get('project', {}).get('name')
             if not project_name:
-                return Response({'error': 'Missing project name in payload'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'error': 'Missing project name in payload'}, status=status.HTTP_200_OK)
 
             # get or create project
             project, created = GitlabProject.objects.get_or_create(name=project_name)
@@ -162,10 +162,10 @@ class GitlabWebhookAPIView(APIView):
             if gitlab_event == 'merge':
 
                 assignee_mentions = [
-                    get_gitlab_mention(a.get('username'), a.get('name')) for a in assignees
+                    get_gitlab_mention(a.get('id'), a.get('name')) for a in assignees
                 ]
                 reviewer_mentions = [
-                    get_gitlab_mention(r.get('username'), r.get('name')) for r in reviewers
+                    get_gitlab_mention(r.get('id'), r.get('name')) for r in reviewers
                 ]
 
                 if project.show_project:
@@ -287,33 +287,35 @@ class TelegramWebhookAPIView(APIView):
             chat_type = message['chat'].get('type', '')
 
             if chat_type == 'private':
-                if cache.get(f'waiting_username_{telegram_id}'):
-                    gitlab_username = text
+                if cache.get(f'waiting_id_{telegram_id}') and text != '/start':
 
-                    # looking for telegram_id
-                    if GitlabUser.objects.filter(telegram_id=telegram_id).exists():
-                        bot_answer(telegram_id, "ℹ️ Siz allaqachon ro'yxatdan o'tgansiz.")
-                        cache.delete(f'waiting_username_{telegram_id}')
-                        return Response({'status': 'already registered'}, status=status.HTTP_200_OK)
+                    if text.isdigit():
+                        # looking for telegram_id
+                        if GitlabUser.objects.filter(telegram_id=telegram_id).exists():
+                            bot_answer(telegram_id, "ℹ️ Siz allaqachon ro'yxatdan o'tgansiz.")
+                            cache.delete(f'waiting_id_{telegram_id}')
+                            return Response({'status': 'already registered'}, status=status.HTTP_200_OK)
 
-                    # looking ofr gitlab_username
-                    if GitlabUser.objects.filter(gitlab_username=gitlab_username).exists():
-                        bot_answer(telegram_id, "❗️Bu GitLab username allaqachon ishlatilgan.")
-                        cache.delete(f'waiting_username_{telegram_id}')
-                        return Response({'status': 'username taken'}, status=status.HTTP_200_OK)
+                        # looking for gitlab_id
+                        if GitlabUser.objects.filter(gitlab_id=text).exists():
+                            bot_answer(telegram_id, "❗️Bu GitLab ID allaqachon ishlatilgan.")
+                            cache.delete(f'waiting_id_{telegram_id}')
+                            return Response({'status': 'gitlab_id taken'}, status=status.HTTP_200_OK)
 
-                    GitlabUser.objects.create(
-                        gitlab_username=gitlab_username,
-                        telegram_id=telegram_id
-                    )
-                    bot_answer(telegram_id, "✅ Ro'yxatdan muvaffaqiyatli o'tdingiz!")
-                    cache.delete(f'waiting_username_{telegram_id}')
-                    return Response({'status': 'registered'}, status=status.HTTP_200_OK)
+                        GitlabUser.objects.create(
+                            gitlab_id=text,
+                            telegram_id=telegram_id
+                        )
+                        bot_answer(telegram_id, "✅ Ro'yxatdan muvaffaqiyatli o'tdingiz!")
+                        cache.delete(f'waiting_id_{telegram_id}')
+                        return Response({'status': 'registered'}, status=status.HTTP_200_OK)
+
+                    return Response({'status': 'Gitlab ID must contain only digits!'})
 
                 if text == '/start':
-                    cache.set(f'waiting_username_{telegram_id}', True, timeout=300)
-                    bot_answer(telegram_id, "🔑 Iltimos, GitLab username'ingizni yuboring.")
-                    return Response({'status': 'asking for username'}, status=status.HTTP_200_OK)
+                    cache.set(f'waiting_id_{telegram_id}', True, timeout=300)
+                    bot_answer(telegram_id, "🔑 Iltimos, GitLab ID'ingizni yuboring.")
+                    return Response({'status': 'asking for gitlab_id'}, status=status.HTTP_200_OK)
 
             is_admin = TelegramAdmin.objects.filter(telegram_id=telegram_id).exists()
             if not is_admin:

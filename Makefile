@@ -16,8 +16,8 @@ clean-migrations:
 push:
 	git push github main && git push gitlab main
 
-run:
-	docker start redis_db
+containers:
+	docker start postgres_db redis_db
 
 check-keys:
 	 docker exec -it redis_db redis-cli keys '*'

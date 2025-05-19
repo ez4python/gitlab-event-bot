@@ -35,9 +35,9 @@ def parse_group_info(message):
     return group_info
 
 
-def get_gitlab_mention(username, full_name):
+def get_gitlab_mention(gitlab_id, full_name):
     try:
-        user = GitlabUser.objects.get(gitlab_username=username)
+        user = GitlabUser.objects.get(gitlab_id=gitlab_id)
         return f"[{full_name}](tg://user?id={user.telegram_id})"
     except GitlabUser.DoesNotExist:
         return full_name
