@@ -29,7 +29,7 @@ class GitlabProject(models.Model):
 
 class GitlabUser(models.Model):
     gitlab_id = models.BigIntegerField(unique=True)
-    gitlab_username = models.CharField(max_length=255, unique=True)
+    gitlab_username = models.CharField(max_length=255)
     telegram_id = models.CharField(max_length=50)
     projects = models.ManyToManyField('apps.GitlabProject', related_name='users')
 
