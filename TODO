@@ -36,4 +36,8 @@ TASKS:
         7. to postgres
 
     UNCOMPLETED:
-        1. change text of telegram message
+        1. simple user unregister
+        2. har bir user uziga mention bulish eventlarini tanlasin
+        3. har bir eventni alohida topigi buladi + bot commands
+        4. + comment event
+        5. projectlar bir nechta guruh va bir nechta topiclarga bog'lanishi kerak
